@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>Statistical Arbitrage: Finding Correlated Stock Pairs</title>
+    <meta name="description" content="Coding , Trading and Datascience" />
+    <meta name="keywords" content="statistical arbitrage,stat Arb,pair trading,pandas,python,training,quant,algorithmic trading" />
+    <meta name="author" content="https://twitter.com/ya7ya" />
+    <link rel="apple-touch-icon" sizes="57x57" href="/assets/img/favicon/apple-touch-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/assets/img/favicon/apple-touch-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/assets/img/favicon/apple-touch-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/assets/img/favicon/apple-touch-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/assets/img/favicon/apple-touch-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/assets/img/favicon/apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/assets/img/favicon/apple-touch-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/assets/img/favicon/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/img/favicon/apple-touch-icon-180x180.png">
+    <link rel="icon" type="image/png" href="/assets/img/favicon/favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="/assets/img/favicon/android-chrome-192x192.png" sizes="192x192">
+    <link rel="icon" type="image/png" href="/assets/img/favicon/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/png" href="/assets/img/favicon/favicon-16x16.png" sizes="16x16">
+    <link rel="manifest" href="/assets/img/favicon/manifest.json">
+    <link rel="shortcut icon" href="/assets/img/favicon/favicon.ico">
+    <meta name="msapplication-TileColor" content="#fff">
+    <meta name="msapplication-TileImage" content="/assets/img/favicon/mstile-144x144.png">
+    <meta name="msapplication-config" content="/assets/img/favicon/browserconfig.xml">
+    <meta name="theme-color" content="#fff">
+
+    <link rel="stylesheet" href="/assets/css/blog.css">
+
+    <!-- FB tags -->
+    <meta property="og:url"                content="http://blog.aboveindex.com/statarb-finding-correlated-pairs" />
+    <meta property="og:type"               content="article" />
+    <meta property="og:title"              content="Statistical Arbitrage: Finding Correlated Stock Pairs" />
+    <meta property="og:description"        content="Statistical Arbitrage , A.K.A StatArb is a pair trading strategy that invloves buying and selling a pair of stocks based on a underlying correlation between them." />
+    <meta property="og:image"              content="http://blog.aboveindex.com//assets/img/statarb1/output_13_0.png" />
+
+    <!-- Twitter Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@ya7ya">
+    <meta name="twitter:creator" content="@ya7ya">
+    <meta name="twitter:title" content="Statistical Arbitrage: Finding Correlated Stock Pairs">
+    <meta name="twitter:description" content="Statistical Arbitrage , A.K.A StatArb is a pair trading strategy that invloves buying and selling a pair of stocks based on a underlying correlation between them.">
+    <meta name="twitter:image" content="http://blog.aboveindex.com//assets/img/statarb1/output_13_0.png">
+
+
+  </head>
+
+  <body class="markdown-body">
+    <div class="header-section header-compact container-fluid">
+      <div class="logo">
+        <a href="/"><img src="/assets/img/ailogo.png" height="35px"></a>
+      </div>
+      <h1 class="no-border">
+        <a href="/">AboveIndex</a>
+      </h1>
+      <div class="small-nav">
+        <a href="#">About</a> -
+        <a href="/">Blog</a> -
+        <a href="https://twitter.com/ya7ya">Contact</a>
+      </div>
+
+    </div>
+
+    <div class="container">
+      <div class="row">
+        <h1 class="post-title no-border">Statistical Arbitrage: Finding Correlated Stock Pairs</h1>
+        <div class="post-meta">
+          <div class="post-date">2017-01-01</div>
+          <div class="post-author"><a href="https://twitter.com/ya7ya">Yahya</a></div>
+        </div>
+
+        <div class="post-body">
+          <p>Statistical Arbitrage , A.K.A StatArb is a pair trading strategy that invloves buying and selling a pair of stocks based on a underlying correlation between them. This correlation usually exist in a given sector or competitors, for example Pepsi <a href="https://finance.yahoo.com/quote/PEP">(PEP)</a> and Coca-Cola <a href="https://finance.yahoo.com/quote/KO">(KO)</a> is a pretty popular pair.</p>
+
+<p>The logic behind the strategy is that pair stocks tend to follow one another, so when they fall outta sync, there is a high chance that they will fall back in sync, which creates an opportunity for the statarb trader.</p>
+
+<p>This article tries to detect these correlations by calculating correlation between stock pairs, to do so , we're going to be using Python Numpy , Pandas to calculate <a href="">corr</a> and Matplotlib to visualize it.</p>
+
+<p>First things first, lets import the libs.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">import</span> numpy <span class="pl-k">as</span> np
+<span class="pl-k">import</span> pandas <span class="pl-k">as</span> pd
+<span class="pl-k">import</span> matplotlib.pyplot <span class="pl-k">as</span> plt
+
+<span class="pl-c"><span class="pl-c">#</span> we're using yahoo finance data, pandas datareader will import the data we need</span>
+<span class="pl-k">from</span> pandas_datareader.data <span class="pl-k">import</span> DataReader</pre></div>
+
+<p>lets first grab the required data from Yahoo Finance and put them in a DataFrame</p>
+
+<div class="highlight highlight-source-python"><pre>start_date <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>2011-01-01<span class="pl-pds">"</span></span>
+symbols <span class="pl-k">=</span> [<span class="pl-s"><span class="pl-pds">"</span>PEP<span class="pl-pds">"</span></span>, <span class="pl-s"><span class="pl-pds">"</span>KO<span class="pl-pds">"</span></span>]
+<span class="pl-c"><span class="pl-c">#</span> df is the main dataframe that'll hold the Adjusted closing prices</span>
+df <span class="pl-k">=</span> pd.DataFrame()
+
+<span class="pl-k">for</span> symbol <span class="pl-k">in</span> symbols:
+    dftemp <span class="pl-k">=</span> DataReader(symbol,<span class="pl-s"><span class="pl-pds">"</span>yahoo<span class="pl-pds">"</span></span>,start_date)
+    <span class="pl-c"><span class="pl-c">#</span> we only need the adjusted close price.</span>
+    df[symbol] <span class="pl-k">=</span> dftemp[<span class="pl-s"><span class="pl-pds">"</span>Adj Close<span class="pl-pds">"</span></span>]
+
+<span class="pl-c"><span class="pl-c">#</span> lets check the data</span>
+<span class="pl-c1">print</span> <span class="pl-s"><span class="pl-pds">"</span>df DataFrame:<span class="pl-cce">\n</span><span class="pl-pds">"</span></span>,df.head()</pre></div>
+
+<pre><code>df DataFrame:
+                  PEP         KO
+Date                            
+2011-01-03  55.135444  27.272059
+2011-01-04  54.850336  26.707549
+2011-01-05  55.839833  26.548651
+2011-01-06  56.049474  26.356299
+2011-01-07  55.672124  26.310301
+</code></pre>
+
+<p>Looks good, Now we gotta create a lagging dataframe, where 1 stock prices is shifted 1 day, This is done because we're trying to detect which stock follows the other.</p>
+
+<div class="highlight highlight-source-python"><pre>dflag <span class="pl-k">=</span> df
+dflag[<span class="pl-s"><span class="pl-pds">"</span>KO_lag<span class="pl-pds">"</span></span>] <span class="pl-k">=</span> dflag[<span class="pl-s"><span class="pl-pds">"</span>KO<span class="pl-pds">"</span></span>].shift(<span class="pl-c1">1</span>)
+
+<span class="pl-c"><span class="pl-c">#</span> delete NaN values caused by the shift</span>
+dflag <span class="pl-k">=</span> dflag.dropna()</pre></div>
+
+<p>Now that we got <code>dflag</code> lets compute the 5 day rolling correlation, luckily for us this can be done with 1 line of code thanks to Numpy and Pandas, This produces an array of correlation values where 1 is perfectly correlated, -1 is prefectly inversely correlated and 0 is not correlated at all.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-c"><span class="pl-c">#</span> computing correlation with 1 line.</span>
+dflag <span class="pl-k">=</span> dflag.assign(<span class="pl-v">correlation</span> <span class="pl-k">=</span> dflag[<span class="pl-s"><span class="pl-pds">"</span>PEP<span class="pl-pds">"</span></span>].rolling(<span class="pl-v">window</span><span class="pl-k">=</span><span class="pl-c1">5</span>).corr(dflag[<span class="pl-s"><span class="pl-pds">"</span>KO_lag<span class="pl-pds">"</span></span>]))
+
+<span class="pl-c1">print</span> dflag.head(<span class="pl-c1">10</span>)</pre></div>
+
+<pre><code>                  PEP         KO     KO_lag  correlation
+Date                                                    
+2011-01-04  54.850336  26.707549  27.272059          NaN
+2011-01-05  55.839833  26.548651  26.707549          NaN
+2011-01-06  56.049474  26.356299  26.548651          NaN
+2011-01-07  55.672124  26.310301  26.356299          NaN
+2011-01-10  55.387016  26.368845  26.310301    -0.622976
+2011-01-11  55.621812  26.214126  26.368845     0.743870
+2011-01-12  55.957238  26.360481  26.214126     0.333118
+2011-01-13  56.108179  26.511017  26.360481    -0.176748
+2011-01-14  55.999162  26.398115  26.511017     0.206867
+2011-01-18  55.823065  26.544469  26.398115     0.015542
+</code></pre>
+
+<p>Note the NaN values there because we specified a 5 day window, so The first 4 days isn't enough to compute correlation. Lets drop those NaN values to avoid errors</p>
+
+<div class="highlight highlight-source-python"><pre>dflag <span class="pl-k">=</span> dflag.dropna()</pre></div>
+
+<p>Next step is to find the most occuring correlation coef to decide whether this pair is mostly correlated or not. to do so, we need to construct a histogram, which basically tallies the number of occurance for each value.</p>
+
+<div class="highlight highlight-source-python"><pre>ax <span class="pl-k">=</span> dflag.hist(<span class="pl-v">column</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>correlation<span class="pl-pds">"</span></span>)
+plt.title(<span class="pl-s"><span class="pl-pds">"</span>Correlation Histogram<span class="pl-pds">"</span></span>)
+plt.show()</pre></div>
+
+<p><a href="/assets/img/statarb1/output_11_0.png" target="_blank"><img src="/assets/img/statarb1/output_11_0.png" alt="png" style="max-width:100%;"></a></p>
+
+<p>Note how values aren't normally distributed and leaning toward 1.0 which indicates high correlation. we can also plot a line to the most occuring value.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-c"><span class="pl-c">#</span> this produces 2 arrays of count and the slices</span>
+count, division <span class="pl-k">=</span> np.histogram(dflag[<span class="pl-s"><span class="pl-pds">"</span>correlation<span class="pl-pds">"</span></span>])
+<span class="pl-c"><span class="pl-c">#</span> argmax is used to get the index of the highest count,</span>
+<span class="pl-c"><span class="pl-c">#</span> then getting the value in the divison array using that index</span>
+most_occuring_value <span class="pl-k">=</span> division[count.argmax()]
+
+ax <span class="pl-k">=</span> dflag.hist(<span class="pl-v">column</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>correlation<span class="pl-pds">"</span></span>)
+plt.title(<span class="pl-s"><span class="pl-pds">"</span>Correlation Histogram<span class="pl-pds">"</span></span>)
+<span class="pl-c"><span class="pl-c">#</span> plotting a line</span>
+plt.axvline(most_occuring_value, <span class="pl-v">color</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>r<span class="pl-pds">"</span></span>, <span class="pl-v">linestyle</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>dashed<span class="pl-pds">"</span></span>, <span class="pl-v">linewidth</span><span class="pl-k">=</span><span class="pl-c1">2</span>)
+plt.show()
+<span class="pl-c1">print</span> <span class="pl-s"><span class="pl-pds">"</span>Most re-occuring Corr value = <span class="pl-c1">%f</span><span class="pl-pds">"</span></span> <span class="pl-k">%</span> most_occuring_value</pre></div>
+
+<p><a href="/assets/img/statarb1/output_13_0.png" target="_blank"><img src="/assets/img/statarb1/output_13_0.png" alt="png" style="max-width:100%;"></a></p>
+
+<pre><code>Most re-occuring Corr value = 0.602270
+</code></pre>
+
+<p>As you can See The 2 stocks seem historically correlated, So lets look at the prices to see how the correlation holds up</p>
+
+<div class="highlight highlight-source-python"><pre>df_normalized <span class="pl-k">=</span> df[[<span class="pl-s"><span class="pl-pds">"</span>PEP<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span>KO<span class="pl-pds">"</span></span>]]
+<span class="pl-c"><span class="pl-c">#</span> normalized the numbers to make it easier to compare</span>
+df_normalized <span class="pl-k">=</span> df_normalized<span class="pl-k">/</span> df_normalized.iloc[<span class="pl-c1">0</span>]
+df_normalized.plot()
+plt.title(<span class="pl-s"><span class="pl-pds">"</span>Normalized Adj Closing Prices<span class="pl-pds">"</span></span>)
+plt.show()</pre></div>
+
+<p><a href="/assets/img/statarb1/output_15_0.png" target="_blank"><img src="/assets/img/statarb1/output_15_0.png" alt="png" style="max-width:100%;"></a></p>
+
+<p>PEP Seems to have preformed higher than KO in the past couple of years but their trend are in line.</p>
+
+<p>One major Caveat here is although pairs move in tandem, there is no rule saying they have to, This means sometimes they could fall outta sync for a long time regardless of the pre-existing historical correlation.</p>
+
+<p>Thats it for now, Feel free to leave a comment If you have a better way of implementing this or if I made a mistake.</p>
+
+<p>Here's the <a href="https://gist.github.com/ya7ya/3dacf63ed4ae6766c00daa8bda189ccc">Gist</a> of the full script</p>
+
+<p><em>Happy Trading</em></p>
+
+
+
+            <em>
+              Get in touch with the author of this post:
+              <a href="https://twitter.com/ya7ya" target="_blank">@ya7ya</a>
+            </em>
+            </p>
+
+
+
+          </div>
+    </div>
+  </div>
+    <footer style="text-align:center;">
+      <p><small>Aboveindex.com</small></p>
+    </footer>
+  </body>
+</html>
