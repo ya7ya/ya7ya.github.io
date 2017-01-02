@@ -1,0 +1,303 @@
+<h1>
+<a id="user-content-calculating-beta-alpha-and-r-squared" class="anchor" href="#calculating-beta-alpha-and-r-squared" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Calculating Beta, Alpha and R Squared</h1>
+
+<hr>
+
+<p>title: Calculating Stock Beta, Alpha and R^2 using Pandas and Statsmodels
+date: 2017-01-02
+slug: calculating-beta
+collection: ["articles","trading"]
+layout: post.html
+author: Yahya
+authorTwitter: ya7ya
+tags: ["trading","alpha","beta","stocks","pandas","python","rolling beta", "statsmodels","linear regression"]</p>
+
+<hr>
+
+<p>According to investopedia <a href="http://www.investopedia.com/terms/b/beta.asp">Beta</a> is a measure of a volatility of an asset (stock or a portfolio) in relation to the overall market. Beta is a main part of the capital asset pricing model (CAPM) which calculates expected return of an asset, follow the links if you wanna learn more about <a href="http://www.investopedia.com/terms/c/capm.asp">CAPM</a> and <a href="http://www.investopedia.com/terms/b/beta.asp">Beta</a>.</p>
+
+<p>In this article we're going to implement a way to calculate Beta using Pandas and Numpy</p>
+
+<h2>
+<a id="user-content-so-how-do-we-calculate-beta" class="anchor" href="#so-how-do-we-calculate-beta" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>so, How do we calculate Beta?</h2>
+
+<p>Beta is simply calculated using regression analysis, which means we're going to create a scatter plot of the asset (stock) return vs the market return, fit a line to it, the slope of that line is the asset beta.</p>
+
+<p>Relax though, we're going to use tools like pandas and statsmodels to do most of the heavy lifting here.</p>
+
+<p>Let's get started by importing Numpy, Pandas and statsmodels , plus matplotlib to generate visualization and DataReader to grab the data from Yahoo Finance</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">import</span> numpy <span class="pl-k">as</span> np
+<span class="pl-k">import</span> pandas <span class="pl-k">as</span> pd
+<span class="pl-k">import</span> matplotlib.pyplot <span class="pl-k">as</span> plt
+
+<span class="pl-c"><span class="pl-c">#</span> statsmodels is used to do OLS regression</span>
+<span class="pl-k">import</span> statsmodels.api <span class="pl-k">as</span> sm
+
+<span class="pl-c"><span class="pl-c">#</span> we're using yahoo finance data, pandas datareader will import the data we need</span>
+<span class="pl-k">from</span> pandas_datareader.data <span class="pl-k">import</span> DataReader</pre></div>
+
+<h2>
+<a id="user-content-preparing-the-data" class="anchor" href="#preparing-the-data" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>preparing the data</h2>
+
+<p>let's load the data from Yahoo Finance, resample it down to monthly prices and calculate the monthly returns</p>
+
+<div class="highlight highlight-source-python"><pre>start_date <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>2013-12-01<span class="pl-pds">"</span></span>
+symbols <span class="pl-k">=</span> [<span class="pl-s"><span class="pl-pds">"</span>MSFT<span class="pl-pds">"</span></span>, <span class="pl-s"><span class="pl-pds">"</span>^GSPC<span class="pl-pds">"</span></span>]
+<span class="pl-c"><span class="pl-c">#</span> df is the main dataframe that'll hold the Adjusted closing prices</span>
+df <span class="pl-k">=</span> pd.DataFrame()
+
+<span class="pl-k">for</span> symbol <span class="pl-k">in</span> symbols:
+    dftemp <span class="pl-k">=</span> DataReader(symbol,<span class="pl-s"><span class="pl-pds">"</span>yahoo<span class="pl-pds">"</span></span>,start_date)
+    <span class="pl-c"><span class="pl-c">#</span> we only need the adjusted close price.</span>
+    df[symbol] <span class="pl-k">=</span> dftemp[<span class="pl-s"><span class="pl-pds">"</span>Adj Close<span class="pl-pds">"</span></span>]
+
+<span class="pl-c"><span class="pl-c">#</span> lets take a look,</span>
+<span class="pl-c1">print</span> df.head()</pre></div>
+
+<pre><code>                 MSFT        ^GSPC
+Date                              
+2013-12-02  35.460313  1800.900024
+2013-12-03  35.331199  1795.150024
+2013-12-04  35.912211  1792.810059
+2013-12-05  35.045302  1785.030029
+2013-12-06  35.377311  1805.089966
+</code></pre>
+
+<p>Seems Legit, moving on to resampling</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-c"><span class="pl-c">#</span> resample the data from daily to monthly</span>
+dfm <span class="pl-k">=</span> df.resample(<span class="pl-s"><span class="pl-pds">'</span>M<span class="pl-pds">'</span></span>).last()
+<span class="pl-c"><span class="pl-c">#</span> print "dfm:\n %s " % dfm.head()</span>
+<span class="pl-c"><span class="pl-c">#</span> this is equal to the 2 lines above. uncomment if you wanna test that.</span>
+<span class="pl-c"><span class="pl-c">#</span> dfm2 = df.asfreq('M',method='ffill')</span>
+<span class="pl-c"><span class="pl-c">#</span> print "dfm2:\n %s" % dfm2.head()</span>
+
+<span class="pl-c"><span class="pl-c">#</span> calculating monthly returns</span>
+dfmret <span class="pl-k">=</span> dfm.pct_change()
+dfmret <span class="pl-k">=</span> dfmret.dropna()
+<span class="pl-c1">print</span> dfmret.head()</pre></div>
+
+<pre><code>                MSFT     ^GSPC
+Date                          
+2014-01-31  0.011494 -0.035583
+2014-02-28  0.020013  0.043117
+2014-03-31  0.069956  0.006932
+2014-04-30 -0.014394  0.006201
+2014-05-31  0.020515  0.021030
+</code></pre>
+
+<p>Now onto the fun part.  </p>
+
+<h2>
+<a id="user-content-visualizing-the-data" class="anchor" href="#visualizing-the-data" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Visualizing The data</h2>
+
+<p>This isn't necessary but it helped me understand the concept better, We'll use a scatter plot to look at the Asset returns compared to the market index</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-c"><span class="pl-c">#</span> create a plot 15 by 6</span>
+fig, ax1 <span class="pl-k">=</span> plt.subplots(<span class="pl-c1">1</span>,<span class="pl-v">figsize</span><span class="pl-k">=</span>(<span class="pl-c1">15</span>,<span class="pl-c1">6</span>))
+ax1.scatter(dfmret[<span class="pl-s"><span class="pl-pds">"</span>^GSPC<span class="pl-pds">"</span></span>],dfmret.iloc[:,<span class="pl-c1">0</span>],<span class="pl-v">label</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>monthly returns<span class="pl-pds">"</span></span>, <span class="pl-v">color</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>blue<span class="pl-pds">'</span></span>, <span class="pl-v">edgecolors</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>none<span class="pl-pds">'</span></span>, <span class="pl-v">alpha</span><span class="pl-k">=</span><span class="pl-c1">0.7</span>)
+ax1.grid(<span class="pl-c1">True</span>)
+
+ax1.set_xlabel(<span class="pl-s"><span class="pl-pds">"</span>S&amp;P500 Monthly Returns<span class="pl-pds">"</span></span>)
+ax1.set_ylabel(<span class="pl-s"><span class="pl-pds">"</span><span class="pl-c1">%s</span> Monthly Returns<span class="pl-pds">"</span></span> <span class="pl-k">%</span> (dfmret.columns[<span class="pl-c1">0</span>]))
+
+plt.show()</pre></div>
+
+<p><a href="/assets/img/calcbeta/output_9_0.png" target="_blank"><img src="/assets/img/calcbeta/output_9_0.png" alt="png" style="max-width:100%;"></a></p>
+
+<p>So far, so good. Now that we have this, we can fit a line to it, calculate its slope and we got our Beta, To do so we need to use a linear regression model, I usually use scikit-learn for my linear regression needs, but for today, lets use statsmodels which integrates nicely with Pandas, it was a part of it as a matter of fact.</p>
+
+<h2>
+<a id="user-content-fitting-the-linear-model" class="anchor" href="#fitting-the-linear-model" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Fitting the Linear Model</h2>
+
+<p>The idea is pretty straight forward, the model Takes X and Y values and returns a line that best fits these values. we can then compute the beta and alpha from the generated line.</p>
+
+<p>Y could also be a formula for the line, but luckily an ndarray works fine.</p>
+
+<p>first, we gotta add a constant line, called the intercept, it's a simple array of 1.0</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-c"><span class="pl-c">#</span> create the X we're gonna feed to the model</span>
+<span class="pl-c"><span class="pl-c">#</span> dfmret.iloc[:,1] is slicing to include all the rows ":" in the second column</span>
+<span class="pl-c"><span class="pl-c">#</span> then we add the constant.</span>
+<span class="pl-c1">X</span> <span class="pl-k">=</span> sm.add_constant(dfmret.iloc[:,<span class="pl-c1">1</span>])
+<span class="pl-c"><span class="pl-c">#</span> y is the values of the monthly returns of the stock = the first column</span>
+y <span class="pl-k">=</span> dfmret.iloc[:,<span class="pl-c1">0</span>]
+
+<span class="pl-c"><span class="pl-c">#</span> creating the model</span>
+model <span class="pl-k">=</span> sm.OLS(y,<span class="pl-c1">X</span>).fit()
+
+<span class="pl-c"><span class="pl-c">#</span> lets see what we got so far</span>
+<span class="pl-c1">print</span> model.summary()</pre></div>
+
+<pre><code>                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                   MSFT   R-squared:                       0.361
+Model:                            OLS   Adj. R-squared:                  0.342
+Method:                 Least Squares   F-statistic:                     19.23
+Date:                Tue, 03 Jan 2017   Prob (F-statistic):           0.000106
+Time:                        01:10:22   Log-Likelihood:                 54.239
+No. Observations:                  36   AIC:                            -104.5
+Df Residuals:                      34   BIC:                            -101.3
+Df Model:                           1                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P&gt;|t|      [95.0% Conf. Int.]
+------------------------------------------------------------------------------
+const          0.0110      0.009      1.172      0.249        -0.008     0.030
+^GSPC          1.3264      0.302      4.385      0.000         0.712     1.941
+==============================================================================
+Omnibus:                        5.515   Durbin-Watson:                   2.498
+Prob(Omnibus):                  0.063   Jarque-Bera (JB):                4.536
+Skew:                           0.511   Prob(JB):                        0.104
+Kurtosis:                       4.407   Cond. No.                         32.9
+==============================================================================
+
+Warnings:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+</code></pre>
+
+<p>The Regression results tells us alot, including Beta, Alpha and R^2 , beta is the market coefficient or <code>^GSPC coef</code> , alpha is the constant coef or <code>const coef</code> since it's the distance between X axis and the line.</p>
+
+<p>now let's see how the line looks when plotted to the scatter plot</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-c"><span class="pl-c">#</span> THATS IT, here is beta</span>
+beta <span class="pl-k">=</span> model.params[<span class="pl-s"><span class="pl-pds">"</span>^GSPC<span class="pl-pds">"</span></span>]
+alpha <span class="pl-k">=</span> model.params[<span class="pl-s"><span class="pl-pds">"</span>const<span class="pl-pds">"</span></span>]
+rsqr <span class="pl-k">=</span> model.rsquared
+
+<span class="pl-c"><span class="pl-c">#</span> adding the line to the plot</span>
+
+<span class="pl-c"><span class="pl-c">#</span> From the earlier step</span>
+fig, ax1 <span class="pl-k">=</span> plt.subplots(<span class="pl-c1">1</span>,<span class="pl-v">figsize</span><span class="pl-k">=</span>(<span class="pl-c1">15</span>,<span class="pl-c1">6</span>))
+ax1.scatter(dfmret[<span class="pl-s"><span class="pl-pds">"</span>^GSPC<span class="pl-pds">"</span></span>],dfmret.iloc[:,<span class="pl-c1">0</span>],<span class="pl-v">label</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>monthly returns<span class="pl-pds">"</span></span>, <span class="pl-v">color</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>blue<span class="pl-pds">'</span></span>, <span class="pl-v">edgecolors</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>none<span class="pl-pds">'</span></span>, <span class="pl-v">alpha</span><span class="pl-k">=</span><span class="pl-c1">0.7</span>)
+ax1.grid(<span class="pl-c1">True</span>)
+ax1.set_xlabel(<span class="pl-s"><span class="pl-pds">"</span>S&amp;P500 Monthly Returns<span class="pl-pds">"</span></span>)
+ax1.set_ylabel(<span class="pl-s"><span class="pl-pds">"</span><span class="pl-c1">%s</span> Monthly Returns<span class="pl-pds">"</span></span> <span class="pl-k">%</span> (dfmret.columns[<span class="pl-c1">0</span>]))
+
+<span class="pl-c"><span class="pl-c">#</span> create X points of the line, by using the min and max points to generate sequence</span>
+line_x <span class="pl-k">=</span> np.linspace(dfmret.iloc[:,<span class="pl-c1">0</span>].min(), dfmret.iloc[:,<span class="pl-c1">0</span>].max())
+
+<span class="pl-c"><span class="pl-c">#</span> generate y points by multiplying x by the slope</span>
+ax1.plot(line_x, line_x<span class="pl-k">*</span>model.params[<span class="pl-s"><span class="pl-pds">"</span>^GSPC<span class="pl-pds">"</span></span>], <span class="pl-v">color</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>red<span class="pl-pds">"</span></span>, <span class="pl-v">label</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>beta<span class="pl-pds">"</span></span>)
+
+<span class="pl-c"><span class="pl-c">#</span> add legend</span>
+ax1.legend(<span class="pl-v">loc</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>upper center<span class="pl-pds">'</span></span>, <span class="pl-v">ncol</span><span class="pl-k">=</span><span class="pl-c1">2</span>, <span class="pl-v">fontsize</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>large<span class="pl-pds">'</span></span>)
+<span class="pl-c"><span class="pl-c">#</span> add Beta and R2 stats to plot</span>
+ax1.text(<span class="pl-k">-</span><span class="pl-c1">0.12</span>, <span class="pl-c1">0.12</span>, <span class="pl-s"><span class="pl-pds">'</span>Beta: <span class="pl-c1">%.2f</span><span class="pl-pds">'</span></span> <span class="pl-k">%</span> beta, <span class="pl-v">fontsize</span><span class="pl-k">=</span><span class="pl-c1">12</span>)
+ax1.text(<span class="pl-k">-</span><span class="pl-c1">0.12</span>, <span class="pl-c1">0.09</span>, <span class="pl-s"><span class="pl-pds">'</span>Alpha: <span class="pl-c1">%.2f</span><span class="pl-pds">'</span></span> <span class="pl-k">%</span> alpha, <span class="pl-v">fontsize</span><span class="pl-k">=</span><span class="pl-c1">12</span>)
+ax1.text(<span class="pl-k">-</span><span class="pl-c1">0.12</span>, <span class="pl-c1">0.06</span>, <span class="pl-s"><span class="pl-pds">'</span>r^2: <span class="pl-c1">%.2f</span><span class="pl-pds">'</span></span> <span class="pl-k">%</span> rsqr, <span class="pl-v">fontsize</span><span class="pl-k">=</span><span class="pl-c1">12</span>)
+
+
+plt.show()</pre></div>
+
+<p><a href="/assets/img/calcbeta/output_13_0.png" target="_blank"><img src="/assets/img/calcbeta/output_13_0.png" alt="png" style="max-width:100%;"></a></p>
+
+<h2>
+<a id="user-content-rolling-beta-alpha-and-r2" class="anchor" href="#rolling-beta-alpha-and-r2" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Rolling Beta, Alpha and R^2</h2>
+
+<p>using the same code we can generate a rolling stats for the stock, It's useful to look at the moving stats to see how relation to the market changed over time.</p>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">def</span> <span class="pl-en">get_monthly_returns</span>(<span class="pl-smi">symbols</span>,<span class="pl-smi">start_date</span>):
+    <span class="pl-c"><span class="pl-c">#</span> df is the main dataframe that'll hold the Adjusted closing prices</span>
+    df <span class="pl-k">=</span> pd.DataFrame()
+
+    <span class="pl-k">for</span> symbol <span class="pl-k">in</span> symbols:
+        dftemp <span class="pl-k">=</span> DataReader(symbol,<span class="pl-s"><span class="pl-pds">"</span>yahoo<span class="pl-pds">"</span></span>,start_date)
+        <span class="pl-c"><span class="pl-c">#</span> we only need the adjusted close price.</span>
+        df[symbol] <span class="pl-k">=</span> dftemp[<span class="pl-s"><span class="pl-pds">"</span>Adj Close<span class="pl-pds">"</span></span>]
+
+    dfm <span class="pl-k">=</span> df.resample(<span class="pl-s"><span class="pl-pds">'</span>M<span class="pl-pds">'</span></span>).last()
+    dfm_returns <span class="pl-k">=</span> dfm.pct_change()
+    <span class="pl-k">return</span> dfm_returns</pre></div>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-c"><span class="pl-c">#</span> wrapping up the code in a simple function</span>
+<span class="pl-k">def</span> <span class="pl-en">calc_stats</span>(<span class="pl-smi">df</span>):
+    <span class="pl-s"><span class="pl-pds">'''</span></span>
+<span class="pl-s">        requires a DataFrame of monthly returns where</span>
+<span class="pl-s">        first column is the stock</span>
+<span class="pl-s">        second column is the market index</span>
+<span class="pl-s">    <span class="pl-pds">'''</span></span>
+    <span class="pl-c1">X</span> <span class="pl-k">=</span> sm.add_constant(df.iloc[:,<span class="pl-c1">1</span>])
+    model <span class="pl-k">=</span> sm.OLS(df.iloc[:,<span class="pl-c1">0</span>],<span class="pl-c1">X</span>).fit()
+
+    beta <span class="pl-k">=</span> model.params[<span class="pl-s"><span class="pl-pds">"</span>^GSPC<span class="pl-pds">"</span></span>]
+    alpha <span class="pl-k">=</span> model.params[<span class="pl-s"><span class="pl-pds">"</span>const<span class="pl-pds">"</span></span>]
+    r2 <span class="pl-k">=</span> model.rsquared
+    <span class="pl-k">return</span> beta, alpha, r2</pre></div>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-k">def</span> <span class="pl-en">rolling_stats</span>(<span class="pl-smi">df</span>, <span class="pl-smi">window</span><span class="pl-k">=</span><span class="pl-c1">5</span>):
+    <span class="pl-c"><span class="pl-c">#</span>     dataframe to hold the results</span>
+    res <span class="pl-k">=</span> pd.DataFrame(<span class="pl-v">index</span><span class="pl-k">=</span>df.index)
+
+    <span class="pl-k">for</span> i <span class="pl-k">in</span> <span class="pl-v">xrange</span>(<span class="pl-c1">0</span>,<span class="pl-c1">len</span>(df.index)):
+
+        <span class="pl-k">if</span> <span class="pl-c1">len</span>(df) <span class="pl-k">-</span> i <span class="pl-k">&gt;=</span> window:
+            <span class="pl-c"><span class="pl-c">#</span> break the df into smaller chunks</span>
+            chunk <span class="pl-k">=</span> df.iloc[i:window<span class="pl-k">+</span>i,:]
+            <span class="pl-c"><span class="pl-c">#</span> calc_stats is a function created from the code above,</span>
+            <span class="pl-c"><span class="pl-c">#</span> refer to the Gist at the end of the article.</span>
+            beta,alpha,r2 <span class="pl-k">=</span> calc_stats(chunk)
+            res.set_value(chunk.tail(<span class="pl-c1">1</span>).index[<span class="pl-c1">0</span>],<span class="pl-s"><span class="pl-pds">"</span>beta<span class="pl-pds">"</span></span>,beta)
+            res.set_value(chunk.tail(<span class="pl-c1">1</span>).index[<span class="pl-c1">0</span>],<span class="pl-s"><span class="pl-pds">"</span>alpha<span class="pl-pds">"</span></span>,alpha)
+            res.set_value(chunk.tail(<span class="pl-c1">1</span>).index[<span class="pl-c1">0</span>],<span class="pl-s"><span class="pl-pds">"</span>r2<span class="pl-pds">"</span></span>,r2)
+            <span class="pl-c"><span class="pl-c">#</span> print "%s beta: %.4f \t alpha: %.4f" % (chunk.tail(1).index[0],b,a)</span>
+    res <span class="pl-k">=</span> res.dropna()
+    <span class="pl-k">return</span> res
+</pre></div>
+
+<div class="highlight highlight-source-python"><pre><span class="pl-c"><span class="pl-c">#</span>testing the rolling stats</span>
+dftest <span class="pl-k">=</span> get_monthly_returns([<span class="pl-s"><span class="pl-pds">"</span>AAPL<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span>^GSPC<span class="pl-pds">"</span></span>],<span class="pl-s"><span class="pl-pds">"</span>2008-01-01<span class="pl-pds">"</span></span>)
+df_rolling <span class="pl-k">=</span> rolling_stats(dftest, <span class="pl-v">window</span><span class="pl-k">=</span><span class="pl-c1">10</span>)
+
+<span class="pl-c1">print</span> df_rolling.head(<span class="pl-c1">20</span>)
+
+<span class="pl-c"><span class="pl-c">#</span> plotting the rolling beta</span>
+ax <span class="pl-k">=</span> df_rolling[[<span class="pl-s"><span class="pl-pds">"</span>beta<span class="pl-pds">"</span></span>]].plot(<span class="pl-v">title</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>AAPL Rolling Beta<span class="pl-pds">"</span></span>)
+ax.grid(<span class="pl-c1">True</span>)
+ax.legend(<span class="pl-v">loc</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>upper left<span class="pl-pds">'</span></span>, <span class="pl-v">ncol</span><span class="pl-k">=</span><span class="pl-c1">2</span>, <span class="pl-v">fontsize</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">'</span>small<span class="pl-pds">'</span></span>)
+plt.show()</pre></div>
+
+<pre><code>                beta     alpha        r2
+Date                                    
+2008-11-30  1.673596  0.042146  0.471210
+2008-12-31  1.527930  0.029536  0.414000
+2009-01-31  1.248017  0.020263  0.316976
+2009-02-28  0.675371 -0.016330  0.115726
+2009-03-31  0.931183  0.001146  0.255890
+2009-04-30  1.112707  0.021580  0.385105
+2009-05-31  1.126251  0.027955  0.421310
+2009-06-30  1.120403  0.027354  0.416387
+2009-07-31  0.901389  0.053803  0.546569
+2009-08-31  1.034426  0.042763  0.513715
+2009-09-30  0.815390  0.059506  0.436485
+2009-10-31  0.809741  0.071444  0.657997
+2009-11-30  0.950798  0.056032  0.690917
+2009-12-31  1.483326  0.027239  0.759880
+2010-01-31  1.670954  0.013031  0.804248
+2010-02-28  1.501126  0.014937  0.725170
+2010-03-31  1.674662  0.016668  0.752001
+2010-04-30  1.676677  0.020403  0.681627
+2010-05-31  1.142485  0.036008  0.559702
+2010-06-30  1.198003  0.040853  0.650188
+</code></pre>
+
+<p><a href="/assets/img/calcbeta/output_18_1.png" target="_blank"><img src="/assets/img/calcbeta/output_18_1.png" alt="png" style="max-width:100%;"></a></p>
+
+<p>Thats it for now, Feel free to leave a tweet If you have a better way of implementing this or if I made a mistake.</p>
+
+<p>Here's the <a href="https://gist.github.com/ya7ya/32cfb4173baebae5161c08da1e818ce1">Gist</a> of the full script</p>
+
+<p><em>Happy Trading</em></p>
+
+<h3>
+<a id="user-content-references" class="anchor" href="#references" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>references</h3>
+
+<ul>
+<li><a href="https://deliberatevaluation.com/2015/12/28/calculating-beta-with-python/">https://deliberatevaluation.com/2015/12/28/calculating-beta-with-python/</a></li>
+<li><a href="http://gouthamanbalaraman.com/blog/calculating-stock-beta.html">http://gouthamanbalaraman.com/blog/calculating-stock-beta.html</a></li>
+<li><a href="http://www.investopedia.com/ask/answers/070615/what-formula-calculating-beta.asp">http://www.investopedia.com/ask/answers/070615/what-formula-calculating-beta.asp</a></li>
+<li><a href="http://stackoverflow.com/questions/19991445/run-an-ols-regression-with-pandas-data-frame">http://stackoverflow.com/questions/19991445/run-an-ols-regression-with-pandas-data-frame</a></li>
+<li><a href="http://money.stackexchange.com/questions/21911/what-time-period-is-used-by-yahoo-finance-to-calculate-beta">http://money.stackexchange.com/questions/21911/what-time-period-is-used-by-yahoo-finance-to-calculate-beta</a></li>
+<li><a href="http://nbviewer.jupyter.org/gist/dartdog/9008026">http://nbviewer.jupyter.org/gist/dartdog/9008026</a></li>
+</ul>
